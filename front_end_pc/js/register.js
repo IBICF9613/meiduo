@@ -198,7 +198,7 @@ var vm = new Vue({
             this.check_pwd();
             this.check_cpwd();
             this.check_phone();
-            this.check_sms_code();
+            // this.check_sms_code();
             this.check_allow();
 
 
