@@ -75,10 +75,18 @@ class SMSCodeView(View):
         # 把验证码写入日志
         logger.info(sms_code)
 
+        # 利用管道解决处理多个请求
+        pl = redis_conn.pipeline()
         # 设置验证码有效期限
-        redis_conn.setex('sms_%s' % mobile, 300, 1)
+        # redis_conn.setex('sms_%s' % mobile, 300, 1)
+        pl.setex('sms_%s' % mobile, 300, 1)
+
         # 设置手机号标记
-        redis_conn.setex('send_flag_%s' % mobile, 60, 1)
+        # redis_conn.setex('send_flag_%s' % mobile, 60, 1)
+        pl.setex('send_flag_%s' % mobile, 60, 1)
+
+        # 执行管道
+        pl.execute()
 
         # 发送验证码
         # CCP().send_template_sms('手机号码', ['验证码', '有效期'], '短信模板')
