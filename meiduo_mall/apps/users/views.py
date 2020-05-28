@@ -3,7 +3,7 @@ from django import http
 from django.views import View
 from .models import User
 import logging
-from django.http import JsonResponse
+from django_redis import get_redis_connection
 
 logger = logging.getLogger('django')
 import json
@@ -59,10 +59,11 @@ class RegisterView(View):
         password2 = json_dict.get('password2')
         mobile = json_dict.get('mobile')
         allow = json_dict.get('allow')
+        sms_code_client = json_dict.get('sms_code')
 
         # 校验参数
         # 校验整体
-        if not all([username, password, password2, mobile, allow]):
+        if not all([username, password, password2, mobile, allow, sms_code_client]):
             return http.JsonResponse({'code': 400, 'errmsg': '缺少必传参数'})
 
         # 用户名校验
@@ -78,18 +79,30 @@ class RegisterView(View):
             return http.JsonResponse({'code': 400, 'errmsg': '两次输入不一致'})
 
         # 手机号校验
-        if not re.match(r'^1[3-9]\d{9}$',mobile):
+        if not re.match(r'^1[3-9]\d{9}$', mobile):
             return http.JsonResponse({'code': 400, 'errmsg': '手机号格式错误'})
 
         # 协议校验
         if allow != True:
             return http.JsonResponse({'code': 400, 'errmsg': '未同意协议'})
 
+        # 短信验证
+        redis_conn = get_redis_connection('verify_code')
+        # 获取验证码
+        sms_code_server = redis_conn.get('sms_%s' % mobile)
+
+        # 判断验证码是否存在
+        if not sms_code_server:
+            return http.JsonResponse({'code': 400, 'errmsg': '验证码过期'})
+
+        # 对比验证码
+        if sms_code_server.decode() != sms_code_client:
+            return http.JsonResponse({'code': 400, 'errmsg': '验证码错误'})
+
         # 实现业务逻辑
         # 将注册的用户保存到数据库
         try:
             user = User.objects.create_user(username=username, password=password, mobile=mobile)
-
         except Exception as e:
             logger.error(e)
             return http.JsonResponse({'code': 400, 'errmsg': '保存数据库出错'})
