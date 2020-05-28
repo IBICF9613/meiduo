@@ -1,10 +1,10 @@
-from django.shortcuts import render
+import random, logging
 from verifications.libs.captcha.captcha import captcha
 from django import http
 from django_redis import get_redis_connection
 from django.views import View
 from verifications.libs.yuntongxun.ccp_sms import CCP
-import random, logging
+
 logger = logging.getLogger('django')
 
 
@@ -36,6 +36,14 @@ class SMSCodeView(View):
     # 请求地址http://www.meiduo.site:8000/sms_codes/<mobile:mobile>/
     # 必传参数mobile
     def get(self, request, mobile):
+        # 为了防止频繁发送验证码，需在逻辑前取得标记
+        # 建立链接
+        redis_conn = get_redis_connection('verify_code')
+        send_flag = redis_conn.get('send_flag_%s' % mobile)
+
+        # 判断send_flag是否存在
+        if send_flag:
+            return http.JsonResponse({'code': 400, 'errmsg': '频繁发送验证码'})
         # 接收参数
         image_code_client = request.GET.get('image_code')
         uuid = request.GET.get('image_code_id')
@@ -45,8 +53,6 @@ class SMSCodeView(View):
             return http.JsonResponse({'code': 400, 'errmsg': '缺少必传参数'})
 
         # 实现逻辑
-        # 建立链接
-        redis_conn = get_redis_connection('verify_code')
         # 服务器获取验证码
         image_code_server = redis_conn.get('img_%s' % uuid)
 
@@ -71,6 +77,8 @@ class SMSCodeView(View):
 
         # 设置验证码有效期限
         redis_conn.setex('sms_%s' % mobile, 300, 1)
+        # 设置手机号标记
+        redis_conn.setex('send_flag_%s' % mobile, 60, 1)
 
         # 发送验证码
         # CCP().send_template_sms('手机号码', ['验证码', '有效期'], '短信模板')

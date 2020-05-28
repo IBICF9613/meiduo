@@ -1,14 +1,14 @@
-from django.shortcuts import render
+import logging
+import json
+import re
+
 from django import http
 from django.views import View
 from .models import User
-import logging
 from django_redis import get_redis_connection
+from django.contrib.auth import login
 
 logger = logging.getLogger('django')
-import json
-import re
-from django.contrib.auth import login
 
 
 # Create your views here.
@@ -83,7 +83,7 @@ class RegisterView(View):
             return http.JsonResponse({'code': 400, 'errmsg': '手机号格式错误'})
 
         # 协议校验
-        if allow != True:
+        if not allow:
             return http.JsonResponse({'code': 400, 'errmsg': '未同意协议'})
 
         # 短信验证
